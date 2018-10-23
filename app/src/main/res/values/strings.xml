@@ -5,4 +5,8 @@
     <string name="setting_enabled" translatable="false">EnabledSetting</string>
     <string name="settings_label">Settings</string>
     <string name="enable_geofences">Enable Geofences</string>
+    <string name="location_permission">Allow To Access Location</string>
+    <string name="need_location_permission_message">Need a location permission</string>
+    <string name="need_location_permission_granted_message">location permission granted</string>
+    <string name="google_play_api">AIzaSyAOg8IXQ4iFWTUhMgXEj3SgGqQBA4xMDTU</string>
 </resources>
