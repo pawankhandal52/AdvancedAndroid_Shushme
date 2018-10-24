@@ -19,6 +19,8 @@ package com.example.android.shushme;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -38,10 +40,16 @@ import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
 import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlacePicker;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements
         ConnectionCallbacks,
@@ -51,6 +59,7 @@ public class MainActivity extends AppCompatActivity implements
     public static final String TAG = MainActivity.class.getSimpleName();
     private static final int PERMISSIONS_REQUEST_FINE_LOCATION = 111;
     private static final int PLACE_PICKER_REQUEST = 1;
+    private GoogleApiClient client;
 
     // Member variables
     private PlaceListAdapter mAdapter;
@@ -70,14 +79,14 @@ public class MainActivity extends AppCompatActivity implements
         mRecyclerView = (RecyclerView) findViewById(R.id.places_list_recycler_view);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         // TODO (3) Modify the Adapter to take a PlaceBuffer in the constructor
-        mAdapter = new PlaceListAdapter(this);
+        mAdapter = new PlaceListAdapter(this, null);
         mRecyclerView.setAdapter(mAdapter);
 
 
         // Build up the LocationServices API client
         // Uses the addApi method to request the LocationServices API
         // Also uses enableAutoManage to automatically when to connect/suspend the client
-        GoogleApiClient client = new GoogleApiClient.Builder(this)
+         client = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
@@ -93,6 +102,33 @@ public class MainActivity extends AppCompatActivity implements
         // Note: When calling Places.GeoDataApi.getPlaceById use the same GoogleApiClient created
         // in MainActivity's onCreate (you will have to declare it as a private member)
 
+    private void refreshPlacesData(){
+        
+        Uri uri = PlaceContract.PlaceEntry.CONTENT_URI;
+        Log.i(TAG, "refreshPlacesData: Content uri "+uri);
+        Cursor data = getContentResolver().query(
+                uri,
+                null,
+                null,
+                null,
+                null);
+        
+        if (data == null || data.getCount() == 0) return;
+    
+        List<String> guide = new ArrayList<>();
+        while(data.moveToNext()){
+            guide.add(data.getString(data.getColumnIndex(PlaceContract.PlaceEntry.COLUMN_PLACE_ID)));
+        }
+    
+        PendingResult<PlaceBuffer> placeBufferPendingResult = Places.GeoDataApi.getPlaceById(client,
+                guide.toArray(new String[guide.size()]));
+        placeBufferPendingResult.setResultCallback(new ResultCallback<PlaceBuffer>() {
+            @Override
+            public void onResult(@NonNull PlaceBuffer places) {
+                mAdapter.swapPlaces(places);
+            }
+        });
+    }
     //TODO (8) Set the getPlaceById callBack so that onResult calls the Adapter's swapPlaces with the result
 
     //TODO (2) call refreshPlacesData in GoogleApiClient's onConnected and in the Add New Place button click event
@@ -105,6 +141,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onConnected(@Nullable Bundle connectionHint) {
         Log.i(TAG, "API Client Connection Successful!");
+        refreshPlacesData();
     }
 
     /***
@@ -144,6 +181,7 @@ public class MainActivity extends AppCompatActivity implements
             PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
             Intent i = builder.build(this);
             startActivityForResult(i, PLACE_PICKER_REQUEST);
+            
         } catch (GooglePlayServicesRepairableException e) {
             Log.e(TAG, String.format("GooglePlayServices Not Available [%s]", e.getMessage()));
         } catch (GooglePlayServicesNotAvailableException e) {
@@ -178,6 +216,8 @@ public class MainActivity extends AppCompatActivity implements
             ContentValues contentValues = new ContentValues();
             contentValues.put(PlaceContract.PlaceEntry.COLUMN_PLACE_ID, placeID);
             getContentResolver().insert(PlaceContract.PlaceEntry.CONTENT_URI, contentValues);
+    
+            refreshPlacesData();
         }
     }
 
