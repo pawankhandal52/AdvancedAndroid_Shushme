@@ -18,6 +18,7 @@ package com.example.android.shushme;
 
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -31,6 +32,8 @@ import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.Toast;
 
 import com.example.android.shushme.provider.PlaceContract;
@@ -64,6 +67,8 @@ public class MainActivity extends AppCompatActivity implements
     private PlaceListAdapter mAdapter;
     private RecyclerView mRecyclerView;
     private GoogleApiClient mClient;
+    private GeoFencing mGeoFencing;
+    private boolean isGeofenceEnabled;
 
     /**
      * Called when the activity is starting
@@ -83,10 +88,22 @@ public class MainActivity extends AppCompatActivity implements
 
         // TODO (9) Create a boolean SharedPreference to store the state of the "Enable Geofences" switch
         // and initialize the switch based on the value of that SharedPreference
-
+        Switch aSwitch = (Switch) findViewById(R.id.enable_switch);
+        isGeofenceEnabled = getPreferences(MODE_PRIVATE).getBoolean(getString(R.string.setting_enabled),false);
         // TODO (10) Handle the switch's change event and Register/Unregister geofences based on the value of isChecked
         // as well as set a private boolean mIsEnabled to the current switch's state
-
+        aSwitch.setChecked(isGeofenceEnabled);
+        aSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE).edit();
+                editor.putBoolean(getResources().getString(R.string.setting_enabled, isChecked),false);
+                isGeofenceEnabled = isChecked;
+                editor.commit();
+                if (isChecked) mGeoFencing.registerAllGeofences();
+                else mGeoFencing.unRegisterAllGeofences();
+            }
+        });
         // Build up the LocationServices API client
         // Uses the addApi method to request the LocationServices API
         // Also uses enableAutoManage to automatically when to connect/suspend the client
@@ -123,7 +140,7 @@ public class MainActivity extends AppCompatActivity implements
         // using the helper function getGeofencePendingIntent()
 
         // TODO (8) Create a new instance of Geofencing using "this" as the context and mClient as the client
-
+        mGeoFencing = new GeoFencing(this,mClient);
     }
 
     /***
@@ -178,8 +195,11 @@ public class MainActivity extends AppCompatActivity implements
             public void onResult(@NonNull PlaceBuffer places) {
                 mAdapter.swapPlaces(places);
                 // TODO (11) Call updateGeofenceList and registerAllGeofences if mIsEnabled is true
+                mGeoFencing.updateGeofencesList(places);
+                if (isGeofenceEnabled) mGeoFencing.registerAllGeofences();
             }
         });
+        
     }
 
     /***
